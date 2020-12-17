@@ -12,7 +12,7 @@ def residual(t, SV, pars, ptr, flags):
     " ===================== ANODE ====================="
     RTinv = 1/R/SV[ptr.T_an]
     dSV_dt = np.zeros_like(SV)
-    
+
     # Double layer potential:
     eta_an = SV[ptr.phi_an] - pars.dPhi_eq_an
     i_Far_an = pars.i_o_an*(exp(-pars.n_an*F*pars.beta_an*eta_an*RTinv)
@@ -24,7 +24,7 @@ def residual(t, SV, pars, ptr, flags):
 
     # arrays have species ordered as: Li_an, Li+_elyte, electron:
     # Molar production rate (mol/m3/s)
-    sdot_k = np.array([i_Far_an/F/pars.A_fac_an, -i_Far_an/F/pars.A_fac_an,     
+    sdot_k = np.array([i_Far_an/F/pars.A_fac_an, -i_Far_an/F/pars.A_fac_an,
         -i_Far_an/F/pars.A_fac_an])/pars.H_an
     # Species enthalpies (J/mol)
     h_k = np.array([pars.h_Li_an, pars.h_Li_elyte, 0.])
@@ -33,16 +33,22 @@ def residual(t, SV, pars, ptr, flags):
 
     # 1/distance betwen center of anode and center of separator
     dyInv_an = 1/(0.5*pars.H_an + 0.5*pars.H_elyte)
-    # Volume-weighted thermal conductivity between center of anode and center 
-    # of separator 
-    lambda_an = (0.5*(pars.H_an*pars.lambda_cond_an + 
+    # Volume-weighted thermal conductivity between center of anode and center
+    # of separator
+    lambda_an = (0.5*(pars.H_an*pars.lambda_cond_an +
         pars.H_elyte*pars.lambda_cond_elyte)*dyInv_an)
 
-    """ 
-    YOUR CODE GOES HERE (PART I)
-    
-    CALCULATE TERMS FOR VOLUMETRIC THERMAL ENERGY PRODUCTION (W/m3)
     """
+    YOUR CODE GOES HERE (PART I)
+
+    CALCULATE TERMS FOR VOLUMETRIC THERMAL ENERGY PRODUCTION (W/m3)
+    """ dT_dt_sep = (1/RhoCpInv_an)*((Q_cond_an-Q_cond_an_1)+Q_rad+Q_conv+Q_ohm_el+Q_ohm_io+Q_rxn)
+    Q_cond_sep_1 = lambda_sep*A*(T(j+1)-2*T(j)+T(j-1))/dY
+    T(j+1)=SV[ptr.T_elyte]
+    T(j)=SV[ptr.T_an]
+    T(j-1)=SV[ptr.T_ca]
+
+    dT_dt_tot = dT_dt_sep + dT_dt_ca + dT_dt_an
     # Conduction heat transfer from the anode to the electrolyte separator:
     Q_cond_an = 0
 
@@ -57,24 +63,28 @@ def residual(t, SV, pars, ptr, flags):
     END CODING
     """
 
-    dSV_dt[ptr.T_an] = pars.RhoCpInv_an*(flags.rad*Q_rad + flags.cond*Q_cond 
-        + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io + flags.rxn*Q_rxn 
+    dSV_dt[ptr.T_an] = pars.RhoCpInv_an*(flags.rad*Q_rad + flags.cond*Q_cond
+        + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io + flags.rxn*Q_rxn
         + flags.conv*Q_conv)
 
-    
+
     " ===================== ELYTE ====================="
     # 1/distance betwen center of cathode and center of separator
     dyInv_ca = 1/(0.5*pars.H_ca + 0.5*pars.H_elyte)
-    # Volume-weighted thermal conductivity between center of cathode and center 
-    # of separator 
-    lambda_ca = (0.5*(pars.H_ca*pars.lambda_cond_ca + 
+    # Volume-weighted thermal conductivity between center of cathode and center
+    # of separator
+    lambda_ca = (0.5*(pars.H_ca*pars.lambda_cond_ca +
         pars.H_elyte*pars.lambda_cond_elyte)*dyInv_ca)
 
     """
     YOUR CODE GOES HERE (PART II)
 
-    CALCULATE TERMS FOR VOLUMETRIC THERMAL ENERGY PRODUCTION (W/m3)
-    """
+    CALCULATE TERMS FOR VOLUMETRIC THERMAL ENERGY PRODUCTION (W/m3).
+    """dT_dt_ca = (1/RhoCpInv_ca)*((Q_cond_an-Q_cond_ca_1)+Q_rad+Q_conv+Q_ohm_el+Q_ohm_io+Q_rxn)
+    Q_cond_ca_1 = lambda_ca*A*(T(j+1)-2*T(j)+T(j-1))/dY
+    T(j+1)=SV[ptr.T_elyte]
+    T(j)=SV[ptr.T_an]
+    T(j-1)=SV[ptr.T_ca]
     # Conduction heat transfer from the electrolyte separator to the cathode:
     Q_cond_ca = 0
 
@@ -89,12 +99,12 @@ def residual(t, SV, pars, ptr, flags):
     END CODING
     """
 
-    dSV_dt[ptr.T_elyte] = pars.RhoCpInv_elyte*(flags.rad*Q_rad 
-        + flags.cond*Q_cond + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io 
+    dSV_dt[ptr.T_elyte] = pars.RhoCpInv_elyte*(flags.rad*Q_rad
+        + flags.cond*Q_cond + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io
         + flags.rxn*Q_rxn + flags.conv*Q_conv)
 
     " ===================== CATHODE ====================="
-    
+
     # Cathode double layer potential:
     RTinv = 1/R/SV[ptr.T_ca]
     eta_ca = SV[ptr.phi_ca] - pars.dPhi_eq_ca
@@ -116,9 +126,14 @@ def residual(t, SV, pars, ptr, flags):
 
     """
     YOUR CODE GOES HERE (PART III)
-    
+
     CALCULATE TERMS FOR VOLUMETRIC THERMAL ENERGY PRODUCTION (W/m3)
-    """
+    """dT_dt_an = (1/RhoCpInv_an)*((Q_cond_an-Q_cond_an_1)+Q_rad+Q_conv+Q_ohm_el+Q_ohm_io+Q_rxn)
+    Q_cond_an_1 = lambda_an*A*(T(j+1)-2*T(j)+T(j-1))/dY
+    T(j+1)=SV[ptr.T_elyte]
+    T(j)=SV[ptr.T_an]
+    T(j-1)=SV[ptr.T_ca]
+
     Q_rxn = 0
     Q_ohm_el = 0
     Q_ohm_io = 0
@@ -128,8 +143,8 @@ def residual(t, SV, pars, ptr, flags):
     """
     END CODING
     """
-    dSV_dt[ptr.T_ca] = pars.RhoCpInv_ca*(flags.rad*Q_rad + flags.cond*Q_cond 
-        + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io + flags.rxn*Q_rxn 
+    dSV_dt[ptr.T_ca] = pars.RhoCpInv_ca*(flags.rad*Q_rad + flags.cond*Q_cond
+        + flags.ohm_el*Q_ohm_el + flags.ohm_io*Q_ohm_io + flags.rxn*Q_rxn
         + flags.conv*Q_conv)
 
     return dSV_dt
